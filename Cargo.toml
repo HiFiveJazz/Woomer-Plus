@@ -8,3 +8,11 @@ grim-rs = "0.1.6"
 hyprland = "0.4.0-beta.3"
 macroquad = "0.4.14"
 minifb = "0.28.0"
+
+[profile.release]
+codegen-units = 1
+strip = true
+opt-level = "z" # Optimize for size
+# opt-level = 3 # Optimize for speed
+lto = true
+panic = "abort"

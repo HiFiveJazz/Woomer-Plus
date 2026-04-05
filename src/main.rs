@@ -1,9 +1,8 @@
-use std::{env, process, time::Instant};
+use std::{env, process};
 
 use grim_rs::{CaptureParameters, Grim};
 use hyprland::{data::CursorPosition, prelude::*};
 use macroquad::prelude::*;
-// use macroquad::material::{load_material, MaterialParams};
 
 #[derive(Clone, Copy, Debug)]
 struct RectI32 {
@@ -108,9 +107,7 @@ OPTIONS:
 }
 #[macroquad::main(window_conf)]
 async fn main() {
-    let startup = Instant::now();
-
-let mut spotlight_material = load_material(
+let spotlight_material = load_material(
     ShaderSource::Glsl {
         vertex: SPOTLIGHT_VERTEX,
         fragment: SPOTLIGHT_FRAGMENT,
@@ -182,12 +179,12 @@ let mut spotlight_material = load_material(
     let min_y = outputs.iter().map(|o| o.geometry().y()).min().expect("no outputs");
     let max_x = outputs
         .iter()
-        .map(|o| o.geometry().x() + o.geometry().width() as i32)
+        .map(|o| o.geometry().x() + o.geometry().width())
         .max()
         .expect("no outputs");
     let max_y = outputs
         .iter()
-        .map(|o| o.geometry().y() + o.geometry().height() as i32)
+        .map(|o| o.geometry().y() + o.geometry().height())
         .max()
         .expect("no outputs");
 
@@ -264,12 +261,9 @@ let mut spotlight_material = load_material(
     let mut spotlight_opacity = 0.0f32;
 
     request_new_screen_size(selected.w as f32, selected.h as f32);
-
-    eprintln!("startup before first present: {:?}", startup.elapsed());
-
-// let mut fps_accum = 0.0f32;
-// let mut fps_frames = 0u32;
-// let mut worst_frame = 0.0f32;
+    // let mut fps_accum = 0.0f32;
+    // let mut fps_frames = 0u32;
+    // let mut worst_frame = 0.0f32;
 
     loop {
         // NOTE: This is for printing out frametime information, for performance
@@ -306,40 +300,40 @@ let mut spotlight_material = load_material(
         let (mx, my) = mouse_position();
         last_mouse = (mx, my);
 
-let ctrl_down = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
-let shift_down = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+        let ctrl_down = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
+        let shift_down = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
 
-let frame_time = get_frame_time();
+        let frame_time = get_frame_time();
 
-let target_opacity = if ctrl_down { 190.0 / 255.0 } else { 0.0 };
-let fade_speed = 4.0f32;
-spotlight_opacity += (target_opacity - spotlight_opacity) * frame_time * fade_speed;
+        let target_opacity = if ctrl_down { 190.0 / 255.0 } else { 0.0 };
+        let fade_speed = 4.0f32;
+        spotlight_opacity += (target_opacity - spotlight_opacity) * frame_time * fade_speed;
 
-if is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl) {
-    spotlight_radius_multiplier = 5.0;
-    spotlight_radius_multiplier_delta = -15.0;
-}
+        if is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl) {
+            spotlight_radius_multiplier = 5.0;
+            spotlight_radius_multiplier_delta = -15.0;
+        }
 
-let (mx, my) = mouse_position();
-if mx != 0.0 || my != 0.0 {
-    spotlight_mouse_x = mx;
-    spotlight_mouse_y = my;
-}
+        let (mx, my) = mouse_position();
+        if mx != 0.0 || my != 0.0 {
+            spotlight_mouse_x = mx;
+            spotlight_mouse_y = my;
+        }
 
-let (_scroll_x, scroll_y) = mouse_wheel();
-if scroll_y != 0.0 {
-    if ctrl_down && shift_down {
-        spotlight_radius_multiplier_delta -= scroll_y as f32;
-    } else if !shift_down {
-        delta_scale += scroll_y;
-    }
-}
+        let (_scroll_x, scroll_y) = mouse_wheel();
+        if scroll_y != 0.0 {
+            if ctrl_down && shift_down {
+                spotlight_radius_multiplier_delta -= scroll_y;
+            } else if !shift_down {
+                delta_scale += scroll_y;
+            }
+        }
 
-spotlight_radius_multiplier = (
-    spotlight_radius_multiplier + spotlight_radius_multiplier_delta * frame_time
-).clamp(0.3, 10.0);
+        spotlight_radius_multiplier = (
+            spotlight_radius_multiplier + spotlight_radius_multiplier_delta * frame_time
+        ).clamp(0.3, 10.0);
 
-spotlight_radius_multiplier_delta -= spotlight_radius_multiplier_delta * frame_time * 4.0;
+        spotlight_radius_multiplier_delta -= spotlight_radius_multiplier_delta * frame_time * 4.0;
 
         if delta_scale.abs() > 0.01 {
             let pivot_x = last_mouse.0;
@@ -360,7 +354,6 @@ spotlight_radius_multiplier_delta -= spotlight_radius_multiplier_delta * frame_t
 
             delta_scale -= delta_scale * get_frame_time() * 8.0;
         }
-
         if is_mouse_button_pressed(MouseButton::Left) {
             dragging = true;
             last_drag_mouse = last_mouse;
@@ -368,7 +361,6 @@ spotlight_radius_multiplier_delta -= spotlight_radius_multiplier_delta * frame_t
         if is_mouse_button_released(MouseButton::Left) {
             dragging = false;
         }
-
         if dragging {
             let dx = last_mouse.0 - last_drag_mouse.0;
             let dy = last_mouse.1 - last_drag_mouse.1;
@@ -378,100 +370,74 @@ spotlight_radius_multiplier_delta -= spotlight_radius_multiplier_delta * frame_t
 
             last_drag_mouse = last_mouse;
         }
-
         let view_w = selected.w as f32 / zoom;
         let view_h = selected.h as f32 / zoom;
-
         let src_left = camera_target_x;
         let src_top = camera_target_y;
         let src_right = camera_target_x + view_w;
         let src_bottom = camera_target_y + view_h;
-
         let tex_w = stitched_w as f32;
         let tex_h = stitched_h as f32;
-
         let clipped_left = src_left.max(0.0);
         let clipped_top = src_top.max(0.0);
         let clipped_right = src_right.min(tex_w);
         let clipped_bottom = src_bottom.min(tex_h);
 
-if clipped_right > clipped_left && clipped_bottom > clipped_top {
-    let clipped_w = clipped_right - clipped_left;
-    let clipped_h = clipped_bottom - clipped_top;
-
-    let dst_x = ((clipped_left - src_left) / view_w) * selected.w as f32;
-    let dst_y = ((clipped_top - src_top) / view_h) * selected.h as f32;
-    let dst_w = (clipped_w / view_w) * selected.w as f32;
-    let dst_h = (clipped_h / view_h) * selected.h as f32;
-
-    let use_spotlight = ctrl_down || spotlight_opacity > 0.001;
-
-    if use_spotlight {
-// spotlight_material.set_uniform(
-//     "cursor_uv",
-//     [
-//         spotlight_mouse_x / selected.w as f32,
-//         1.0 - spotlight_mouse_y / selected.h as f32,
-//     ],
-// );
-//
-// spotlight_material.set_uniform(
-//     "screen_size",
-//     [selected.w as f32, selected.h as f32],
-// );
-let win_w = screen_width();
-let win_h = screen_height();
-
-spotlight_material.set_uniform(
-    "cursor_uv",
-    [
-        spotlight_mouse_x / win_w,
-        1.0 - (spotlight_mouse_y / win_h),
-    ],
-);
-
-spotlight_material.set_uniform(
-    "screen_size",
-    [win_w, win_h],
-);
-
-spotlight_material.set_uniform(
-    "spotlight_tint",
-    [0.0f32, 0.0f32, 0.0f32, spotlight_opacity],
-);
-
-spotlight_material.set_uniform(
-    "spotlight_radius_multiplier",
-    spotlight_radius_multiplier,
-);
-        gl_use_material(&spotlight_material);
-    }
-
-    draw_texture_ex(
-        &texture,
-        dst_x,
-        dst_y,
-        WHITE,
-        DrawTextureParams {
-            dest_size: Some(vec2(dst_w, dst_h)),
-            source: Some(Rect::new(
-                clipped_left,
-                clipped_top,
-                clipped_w,
-                clipped_h,
-            )),
-            ..Default::default()
-        },
-    );
-
-    if use_spotlight {
-        gl_use_default_material();
-    }
-}
+        if clipped_right > clipped_left && clipped_bottom > clipped_top {
+            let clipped_w = clipped_right - clipped_left;
+            let clipped_h = clipped_bottom - clipped_top;
+            let dst_x = ((clipped_left - src_left) / view_w) * selected.w as f32;
+            let dst_y = ((clipped_top - src_top) / view_h) * selected.h as f32;
+            let dst_w = (clipped_w / view_w) * selected.w as f32;
+            let dst_h = (clipped_h / view_h) * selected.h as f32;
+            let use_spotlight = ctrl_down || spotlight_opacity > 0.001;
+            if use_spotlight {
+                let win_w = screen_width();
+                let win_h = screen_height();
+                spotlight_material.set_uniform(
+                    "cursor_uv",
+                    [
+                        spotlight_mouse_x / win_w,
+                        1.0 - (spotlight_mouse_y / win_h),
+                    ],
+                );
+                spotlight_material.set_uniform(
+                    "screen_size",
+                    [win_w, win_h],
+                );
+                spotlight_material.set_uniform(
+                    "spotlight_tint",
+                    [0.0f32, 0.0f32, 0.0f32, spotlight_opacity],
+                );
+                spotlight_material.set_uniform(
+                    "spotlight_radius_multiplier",
+                    spotlight_radius_multiplier,
+                );
+                gl_use_material(&spotlight_material);
+            }
+            draw_texture_ex(
+                &texture,
+                dst_x,
+                dst_y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(vec2(dst_w, dst_h)),
+                    source: Some(Rect::new(
+                        clipped_left,
+                        clipped_top,
+                        clipped_w,
+                        clipped_h,
+                    )),
+                    ..Default::default()
+                },
+            );
+            if use_spotlight {
+                gl_use_default_material();
+            }
+        }
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::A) {
             break;
         }
-
         next_frame().await;
     }
 }
