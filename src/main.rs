@@ -61,13 +61,13 @@ void main() {
     uv = texcoord;
 }
 "#;
-const HIGHLIGHT_VERTEX: &str = r#"
+
+const BG_BLUR_VERTEX: &str = r#"
 attribute vec3 position;
 attribute vec2 texcoord;
 attribute vec4 color0;
 
 varying vec2 uv;
-varying vec4 color;
 
 uniform mat4 Model;
 uniform mat4 Projection;
@@ -75,86 +75,56 @@ uniform mat4 Projection;
 void main() {
     gl_Position = Projection * Model * vec4(position, 1.0);
     uv = texcoord;
-    color = color0;
 }
 "#;
 
-const HIGHLIGHT_FRAGMENT: &str = r#"
+const BG_BLUR_FRAGMENT: &str = r#"
 varying vec2 uv;
-varying vec4 color;
-
-uniform vec2 spotlight_pos;   // normalized 0..1, same orientation as screen UVs
-uniform float radius;
-uniform float softness;
-uniform float dim_strength;
-uniform float highlight_strength;
-
-void main() {
-    float dist = distance(uv, spotlight_pos);
-
-    // 0 near center, 1 farther out
-    float outer = smoothstep(radius, radius + softness, dist);
-
-    // center boost fades out smoothly
-    float inner = 1.0 - smoothstep(0.0, radius, dist);
-
-    // dark base outside spotlight
-    float dim = outer * dim_strength;
-
-    // gentle lift in center
-    float lift = inner * highlight_strength;
-
-    // multiply-style overlay around ~1.0, not pure white
-    vec3 tint = vec3(1.0 - dim + lift);
-    gl_FragColor = vec4(tint, 1.0);
-}
-"#;
-
-const BLUR_VERTEX: &str = r#"
-attribute vec3 position;
-attribute vec2 texcoord;
-attribute vec4 color0;
-
-varying vec2 uv;
-varying vec4 color;
-
-uniform mat4 Model;
-uniform mat4 Projection;
-
-void main() {
-    gl_Position = Projection * Model * vec4(position, 1.0);
-    uv = texcoord;
-    color = color0;
-}
-"#;
-
-const BLUR_FRAGMENT: &str = r#"
-varying vec2 uv;
-varying vec4 color;
 
 uniform sampler2D Texture;
-uniform vec2 blur_dir;
+uniform vec2 texel_size;
+uniform float blur_strength;
 
 void main() {
+    vec2 stepv = texel_size * blur_strength;
     vec4 sum = vec4(0.0);
 
-    sum += texture2D(Texture, uv - blur_dir * 4.0) * 0.05;
-    sum += texture2D(Texture, uv - blur_dir * 3.0) * 0.09;
-    sum += texture2D(Texture, uv - blur_dir * 2.0) * 0.12;
-    sum += texture2D(Texture, uv - blur_dir * 1.0) * 0.15;
-    sum += texture2D(Texture, uv)                * 0.18;
-    sum += texture2D(Texture, uv + blur_dir * 1.0) * 0.15;
-    sum += texture2D(Texture, uv + blur_dir * 2.0) * 0.12;
-    sum += texture2D(Texture, uv + blur_dir * 3.0) * 0.09;
-    sum += texture2D(Texture, uv + blur_dir * 4.0) * 0.05;
+    sum += texture2D(Texture, uv + stepv * vec2(-2.0, -2.0)) * 0.025;
+    sum += texture2D(Texture, uv + stepv * vec2(-1.0, -2.0)) * 0.035;
+    sum += texture2D(Texture, uv + stepv * vec2( 0.0, -2.0)) * 0.040;
+    sum += texture2D(Texture, uv + stepv * vec2( 1.0, -2.0)) * 0.035;
+    sum += texture2D(Texture, uv + stepv * vec2( 2.0, -2.0)) * 0.025;
 
-    gl_FragColor = vec4(sum.rgb * 0.65, 1.0);
+    sum += texture2D(Texture, uv + stepv * vec2(-2.0, -1.0)) * 0.035;
+    sum += texture2D(Texture, uv + stepv * vec2(-1.0, -1.0)) * 0.050;
+    sum += texture2D(Texture, uv + stepv * vec2( 0.0, -1.0)) * 0.060;
+    sum += texture2D(Texture, uv + stepv * vec2( 1.0, -1.0)) * 0.050;
+    sum += texture2D(Texture, uv + stepv * vec2( 2.0, -1.0)) * 0.035;
+
+    sum += texture2D(Texture, uv + stepv * vec2(-2.0,  0.0)) * 0.040;
+    sum += texture2D(Texture, uv + stepv * vec2(-1.0,  0.0)) * 0.060;
+    sum += texture2D(Texture, uv + stepv * vec2( 0.0,  0.0)) * 0.080;
+    sum += texture2D(Texture, uv + stepv * vec2( 1.0,  0.0)) * 0.060;
+    sum += texture2D(Texture, uv + stepv * vec2( 2.0,  0.0)) * 0.040;
+
+    sum += texture2D(Texture, uv + stepv * vec2(-2.0,  1.0)) * 0.035;
+    sum += texture2D(Texture, uv + stepv * vec2(-1.0,  1.0)) * 0.050;
+    sum += texture2D(Texture, uv + stepv * vec2( 0.0,  1.0)) * 0.060;
+    sum += texture2D(Texture, uv + stepv * vec2( 1.0,  1.0)) * 0.050;
+    sum += texture2D(Texture, uv + stepv * vec2( 2.0,  1.0)) * 0.035;
+
+    sum += texture2D(Texture, uv + stepv * vec2(-2.0,  2.0)) * 0.025;
+    sum += texture2D(Texture, uv + stepv * vec2(-1.0,  2.0)) * 0.035;
+    sum += texture2D(Texture, uv + stepv * vec2( 0.0,  2.0)) * 0.040;
+    sum += texture2D(Texture, uv + stepv * vec2( 1.0,  2.0)) * 0.035;
+    sum += texture2D(Texture, uv + stepv * vec2( 2.0,  2.0)) * 0.025;
+
+    gl_FragColor = vec4(sum.rgb * 0.55, 1.0);
 }
 "#;
 
 fn draw_blurred_background(
     source_texture: &Texture2D,
-    blur_target: &RenderTarget,
     blur_material: &mut Material,
     selected_x: f32,
     selected_y: f32,
@@ -176,17 +146,13 @@ fn draw_blurred_background(
         (x, selected_y, new_w, selected_h)
     };
 
-    // Pass 1: horizontal blur into offscreen target
-    set_camera(&Camera2D {
-        render_target: Some(blur_target.clone()),
-        zoom: vec2(2.0 / win_w, -2.0 / win_h),
-        target: vec2(win_w * 0.5, win_h * 0.5),
-        ..Default::default()
-    });
-    clear_background(BLACK);
+    blur_material.set_uniform(
+        "texel_size",
+        [1.0 / source_texture.width(), 1.0 / source_texture.height()],
+    );
+    blur_material.set_uniform("blur_strength", 6.0f32);
 
     gl_use_material(blur_material);
-    blur_material.set_uniform("blur_dir", [5.0 / selected_w, 0.0]);
 
     draw_texture_ex(
         source_texture,
@@ -201,32 +167,8 @@ fn draw_blurred_background(
     );
 
     gl_use_default_material();
-
-    // Pass 2: vertical blur from offscreen target to screen
-    set_default_camera();
-
-    gl_use_material(blur_material);
-    blur_material.set_uniform("blur_dir", [0.0, 5.0 / selected_h]);
-
-    draw_texture_ex(
-        &blur_target.texture,
-        0.0,
-        0.0,
-        WHITE,
-        DrawTextureParams {
-            dest_size: Some(vec2(win_w, win_h)),
-            source: Some(Rect::new(
-                0.0,
-                0.0,
-                blur_target.texture.width(),
-                -blur_target.texture.height(),
-            )),
-            ..Default::default()
-        },
-    );
-
-    gl_use_default_material();
 }
+
 
 fn window_conf() -> Conf {
     Conf {
@@ -255,27 +197,6 @@ fn get_initial_cursor_pos_for_output(
         local_x.clamp(0.0, out_w as f32),
         local_y.clamp(0.0, out_h as f32),
     ))
-}
-
-fn draw_highlight_overlay(
-    highlight_material: &mut Material,
-    mouse_x: f32,
-    mouse_y: f32,
-    win_w: f32,
-    win_h: f32,
-) {
-    let uv_x = (mouse_x / win_w).clamp(0.0, 1.0);
-    let uv_y = (mouse_y / win_h).clamp(0.0, 1.0);
-
-    highlight_material.set_uniform("spotlight_pos", [uv_x, uv_y]);
-    highlight_material.set_uniform("radius", 0.12f32);
-    highlight_material.set_uniform("softness", 0.18f32);
-    highlight_material.set_uniform("dim_strength", 0.30f32);
-    highlight_material.set_uniform("highlight_strength", 0.06f32);
-
-    gl_use_material(highlight_material);
-    draw_rectangle(0.0, 0.0, win_w, win_h, WHITE);
-    gl_use_default_material();
 }
 
 fn print_help_and_exit(bin: &str) -> ! {
@@ -409,39 +330,23 @@ let mut spotlight_material = load_material(
         stitched_h as u16,
         &stitched_rgba,
     );
-    texture.set_filter(FilterMode::Nearest);
+    texture.set_filter(FilterMode::Linear);
+    // texture.set_filter(FilterMode::Nearest);
 
     let mut blur_material = load_material(
         ShaderSource::Glsl {
-            vertex: BLUR_VERTEX,
-            fragment: BLUR_FRAGMENT,
+            vertex: BG_BLUR_VERTEX,
+            fragment: BG_BLUR_FRAGMENT,
         },
         MaterialParams {
             uniforms: vec![
-                UniformDesc::new("blur_dir", UniformType::Float2),
+                UniformDesc::new("texel_size", UniformType::Float2),
+                UniformDesc::new("blur_strength", UniformType::Float1),
             ],
             ..Default::default()
         },
     )
     .expect("failed to load blur material");
-
-    let mut highlight_material = load_material(
-        ShaderSource::Glsl {
-            vertex: HIGHLIGHT_VERTEX,
-            fragment: HIGHLIGHT_FRAGMENT,
-        },
-        MaterialParams {
-            uniforms: vec![
-                UniformDesc::new("spotlight_pos", UniformType::Float2),
-                UniformDesc::new("radius", UniformType::Float1),
-                UniformDesc::new("softness", UniformType::Float1),
-                UniformDesc::new("dim_strength", UniformType::Float1),
-                UniformDesc::new("highlight_strength", UniformType::Float1),
-            ],
-            ..Default::default()
-        },
-    )
-    .expect("failed to load highlight material");
 
     let mut camera_target_x = (selected.x - min_x) as f32;
     let mut camera_target_y = (selected.y - min_y) as f32;
@@ -465,8 +370,6 @@ let mut spotlight_material = load_material(
     let mut spotlight_opacity = 0.0f32;
 
     request_new_screen_size(selected.w as f32, selected.h as f32);
-    let blur_target = render_target(selected.w as u32, selected.h as u32);
-    blur_target.texture.set_filter(FilterMode::Linear);
 
     eprintln!("startup before first present: {:?}", startup.elapsed());
 
@@ -475,7 +378,6 @@ let mut spotlight_material = load_material(
 
         draw_blurred_background(
             &texture,
-            &blur_target,
             &mut blur_material,
             (selected.x - min_x) as f32,
             (selected.y - min_y) as f32,
