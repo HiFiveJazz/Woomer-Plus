@@ -7,17 +7,28 @@ A Blazing fast Zoomer application for Hyprland, heavily inspired by [Woomer](htt
 ## Dependencies
 
 ### Arch Linux
+This project assumes usage of wlr-screencopy and Hyprland (for now!)
+```bash
+sudo pacman -S hyprland wlr-screencopy
+```
 
-```console
-$ sudo pacman -S wlr-screencopy
+
+If you want to compile it manually, nightly rust is required. 
+```bash
+sudo pacman -S rustup
+rustup default stable
+rustup toolchain install nightly
 ```
 
 ## Quick Start
 
-```console
-$ cargo +nightly build --release #Minimize build size
-$ ./zoomer --help
-$ ./zoomer
+
+
+Build and compile it manually or download a pre-compiled binary from [releases](https://github.com/HiFiveJazz/Woomer-Plus/releases/)
+```bash
+cargo +nightly build --release #Minimize build size
+./zoomer --help
+./zoomer
 ```
 
 ## Controls
@@ -26,12 +37,12 @@ $ ./zoomer
 |-------------------------------------------|---------------------------------------------------------------|
 | <kbd>q</kbd> or <kbd>ESC</kbd>            | Quit the application                                         |
 | <kbd>Ctrl</kbd>                           | Flashlight Effect                  |
-| Drag with left mouse button               | Move the image around                                        |
-| Scroll wheel| Zoom in/out                                                  |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>🖱️Scroll Wheel</kbd>                           | Resize Flashlight |
+| Drag with <kbd>🖱️Left Mouse Button</kbd>               | Move the image around                                        |
+| <kbd>🖱️Scroll Wheel</kbd>| Zoom in/out                                                  |
 
 ## Coming Soon
 
-- Config File
-- AUR Package for easy install
-- Changing size of flashlight
-- Drawing on the image with rightclick?
+- TOML Config File
+- AUR Package
+- Drawing on the Image with <kbd>🖱️Right-Click</kbd>
