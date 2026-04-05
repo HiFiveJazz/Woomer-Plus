@@ -2,6 +2,7 @@
 # Woomer+
 
 ![](./demo.gif)
+
 A Blazing fast Zoomer application for Hyprland, heavily inspired by [Woomer](https://github.com/coffeeispower/woomer) and [Boomer](https://github.com/tsoding/boomer)
 ## Dependencies
 
