@@ -13,6 +13,103 @@ struct RectI32 {
     h: usize,
 }
 
+const SPOTLIGHT_FRAGMENT: &str = r#"
+varying vec2 uv;
+
+uniform sampler2D Texture;
+uniform vec2 cursor_uv;                  // normalized 0..1 in window space
+uniform vec4 spotlight_tint;             // black tint with alpha
+uniform float spotlight_radius_multiplier;
+uniform vec2 screen_size;                // current window size in pixels
+
+const float UNIT_RADIUS_PX = 60.0;
+const float EDGE_SOFTNESS_PX = 24.0;
+
+void main() {
+    vec4 texel_color = texture2D(Texture, uv);
+
+    // Fragment position in normalized window space
+    vec2 frag_uv = gl_FragCoord.xy / screen_size;
+
+    // Correct aspect ratio so distance stays circular
+    vec2 delta = frag_uv - cursor_uv;
+    delta.x *= screen_size.x / screen_size.y;
+
+    float radius = (UNIT_RADIUS_PX * spotlight_radius_multiplier) / screen_size.y;
+    float softness = EDGE_SOFTNESS_PX / screen_size.y;
+
+    float dist = length(delta);
+    float mask = smoothstep(radius, radius + softness, dist);
+
+    vec4 tinted = mix(texel_color, vec4(spotlight_tint.rgb, texel_color.a), spotlight_tint.a);
+    gl_FragColor = mix(texel_color, tinted, mask);
+}
+"#;
+
+const SPOTLIGHT_VERTEX: &str = r#"
+attribute vec3 position;
+attribute vec2 texcoord;
+attribute vec4 color0;
+
+varying vec2 uv;
+
+uniform mat4 Model;
+uniform mat4 Projection;
+
+void main() {
+    gl_Position = Projection * Model * vec4(position, 1.0);
+    uv = texcoord;
+}
+"#;
+const HIGHLIGHT_VERTEX: &str = r#"
+attribute vec3 position;
+attribute vec2 texcoord;
+attribute vec4 color0;
+
+varying vec2 uv;
+varying vec4 color;
+
+uniform mat4 Model;
+uniform mat4 Projection;
+
+void main() {
+    gl_Position = Projection * Model * vec4(position, 1.0);
+    uv = texcoord;
+    color = color0;
+}
+"#;
+
+const HIGHLIGHT_FRAGMENT: &str = r#"
+varying vec2 uv;
+varying vec4 color;
+
+uniform vec2 spotlight_pos;   // normalized 0..1, same orientation as screen UVs
+uniform float radius;
+uniform float softness;
+uniform float dim_strength;
+uniform float highlight_strength;
+
+void main() {
+    float dist = distance(uv, spotlight_pos);
+
+    // 0 near center, 1 farther out
+    float outer = smoothstep(radius, radius + softness, dist);
+
+    // center boost fades out smoothly
+    float inner = 1.0 - smoothstep(0.0, radius, dist);
+
+    // dark base outside spotlight
+    float dim = outer * dim_strength;
+
+    // gentle lift in center
+    float lift = inner * highlight_strength;
+
+    // multiply-style overlay around ~1.0, not pure white
+    vec3 tint = vec3(1.0 - dim + lift);
+    gl_FragColor = vec4(tint, 1.0);
+}
+"#;
+
 const BLUR_VERTEX: &str = r#"
 attribute vec3 position;
 attribute vec2 texcoord;
@@ -82,12 +179,14 @@ fn draw_blurred_background(
     // Pass 1: horizontal blur into offscreen target
     set_camera(&Camera2D {
         render_target: Some(blur_target.clone()),
+        zoom: vec2(2.0 / win_w, -2.0 / win_h),
+        target: vec2(win_w * 0.5, win_h * 0.5),
         ..Default::default()
     });
     clear_background(BLACK);
 
     gl_use_material(blur_material);
-    blur_material.set_uniform("blur_dir", [3.0 / selected_w, 0.0]);
+    blur_material.set_uniform("blur_dir", [5.0 / selected_w, 0.0]);
 
     draw_texture_ex(
         source_texture,
@@ -107,7 +206,7 @@ fn draw_blurred_background(
     set_default_camera();
 
     gl_use_material(blur_material);
-    blur_material.set_uniform("blur_dir", [0.0, 3.0 / selected_h]);
+    blur_material.set_uniform("blur_dir", [0.0, 5.0 / selected_h]);
 
     draw_texture_ex(
         &blur_target.texture,
@@ -116,7 +215,12 @@ fn draw_blurred_background(
         WHITE,
         DrawTextureParams {
             dest_size: Some(vec2(win_w, win_h)),
-            source: Some(Rect::new(0.0, 0.0, 1.0, -1.0)),
+            source: Some(Rect::new(
+                0.0,
+                0.0,
+                blur_target.texture.width(),
+                -blur_target.texture.height(),
+            )),
             ..Default::default()
         },
     );
@@ -153,6 +257,27 @@ fn get_initial_cursor_pos_for_output(
     ))
 }
 
+fn draw_highlight_overlay(
+    highlight_material: &mut Material,
+    mouse_x: f32,
+    mouse_y: f32,
+    win_w: f32,
+    win_h: f32,
+) {
+    let uv_x = (mouse_x / win_w).clamp(0.0, 1.0);
+    let uv_y = (mouse_y / win_h).clamp(0.0, 1.0);
+
+    highlight_material.set_uniform("spotlight_pos", [uv_x, uv_y]);
+    highlight_material.set_uniform("radius", 0.12f32);
+    highlight_material.set_uniform("softness", 0.18f32);
+    highlight_material.set_uniform("dim_strength", 0.30f32);
+    highlight_material.set_uniform("highlight_strength", 0.06f32);
+
+    gl_use_material(highlight_material);
+    draw_rectangle(0.0, 0.0, win_w, win_h, WHITE);
+    gl_use_default_material();
+}
+
 fn print_help_and_exit(bin: &str) -> ! {
     eprintln!(
         "\
@@ -169,6 +294,23 @@ OPTIONS:
 #[macroquad::main(window_conf)]
 async fn main() {
     let startup = Instant::now();
+
+let mut spotlight_material = load_material(
+    ShaderSource::Glsl {
+        vertex: SPOTLIGHT_VERTEX,
+        fragment: SPOTLIGHT_FRAGMENT,
+    },
+    MaterialParams {
+        uniforms: vec![
+            UniformDesc::new("cursor_uv", UniformType::Float2),
+            UniformDesc::new("spotlight_tint", UniformType::Float4),
+            UniformDesc::new("spotlight_radius_multiplier", UniformType::Float1),
+            UniformDesc::new("screen_size", UniformType::Float2),
+        ],
+        ..Default::default()
+    },
+)
+.expect("failed to load spotlight material");
 
     let mut args = env::args();
     let bin = args.next().unwrap();
@@ -283,6 +425,24 @@ async fn main() {
     )
     .expect("failed to load blur material");
 
+    let mut highlight_material = load_material(
+        ShaderSource::Glsl {
+            vertex: HIGHLIGHT_VERTEX,
+            fragment: HIGHLIGHT_FRAGMENT,
+        },
+        MaterialParams {
+            uniforms: vec![
+                UniformDesc::new("spotlight_pos", UniformType::Float2),
+                UniformDesc::new("radius", UniformType::Float1),
+                UniformDesc::new("softness", UniformType::Float1),
+                UniformDesc::new("dim_strength", UniformType::Float1),
+                UniformDesc::new("highlight_strength", UniformType::Float1),
+            ],
+            ..Default::default()
+        },
+    )
+    .expect("failed to load highlight material");
+
     let mut camera_target_x = (selected.x - min_x) as f32;
     let mut camera_target_y = (selected.y - min_y) as f32;
     let mut zoom = 1.0f32;
@@ -298,6 +458,11 @@ async fn main() {
 
     let mut dragging = false;
     let mut last_drag_mouse = last_mouse;
+    let mut spotlight_mouse_x = selected.w as f32 * 0.5;
+    let mut spotlight_mouse_y = selected.h as f32 * 0.5;
+    let mut spotlight_radius_multiplier = 1.0f32;
+    let mut spotlight_radius_multiplier_delta = 0.0f32;
+    let mut spotlight_opacity = 0.0f32;
 
     request_new_screen_size(selected.w as f32, selected.h as f32);
     let blur_target = render_target(selected.w as u32, selected.h as u32);
@@ -323,10 +488,40 @@ async fn main() {
         let (mx, my) = mouse_position();
         last_mouse = (mx, my);
 
-        let (_scroll_x, scroll_y) = mouse_wheel();
-        if scroll_y != 0.0 {
-            delta_scale += scroll_y;
-        }
+let ctrl_down = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
+let shift_down = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+
+let frame_time = get_frame_time();
+
+let target_opacity = if ctrl_down { 190.0 / 255.0 } else { 0.0 };
+let fade_speed = 4.0f32;
+spotlight_opacity += (target_opacity - spotlight_opacity) * frame_time * fade_speed;
+
+if is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl) {
+    spotlight_radius_multiplier = 5.0;
+    spotlight_radius_multiplier_delta = -15.0;
+}
+
+let (mx, my) = mouse_position();
+if mx != 0.0 || my != 0.0 {
+    spotlight_mouse_x = mx;
+    spotlight_mouse_y = my;
+}
+
+let (_scroll_x, scroll_y) = mouse_wheel();
+if scroll_y != 0.0 {
+    if ctrl_down && shift_down {
+        spotlight_radius_multiplier_delta -= scroll_y as f32;
+    } else if !shift_down {
+        delta_scale += scroll_y;
+    }
+}
+
+spotlight_radius_multiplier = (
+    spotlight_radius_multiplier + spotlight_radius_multiplier_delta * frame_time
+).clamp(0.3, 10.0);
+
+spotlight_radius_multiplier_delta -= spotlight_radius_multiplier_delta * frame_time * 4.0;
 
         if delta_scale.abs() > 0.01 {
             let pivot_x = last_mouse.0;
@@ -382,33 +577,79 @@ async fn main() {
         let clipped_right = src_right.min(tex_w);
         let clipped_bottom = src_bottom.min(tex_h);
 
-        if clipped_right > clipped_left && clipped_bottom > clipped_top {
-            let clipped_w = clipped_right - clipped_left;
-            let clipped_h = clipped_bottom - clipped_top;
+if clipped_right > clipped_left && clipped_bottom > clipped_top {
+    let clipped_w = clipped_right - clipped_left;
+    let clipped_h = clipped_bottom - clipped_top;
 
-            let dst_x = ((clipped_left - src_left) / view_w) * selected.w as f32;
-            let dst_y = ((clipped_top - src_top) / view_h) * selected.h as f32;
-            let dst_w = (clipped_w / view_w) * selected.w as f32;
-            let dst_h = (clipped_h / view_h) * selected.h as f32;
+    let dst_x = ((clipped_left - src_left) / view_w) * selected.w as f32;
+    let dst_y = ((clipped_top - src_top) / view_h) * selected.h as f32;
+    let dst_w = (clipped_w / view_w) * selected.w as f32;
+    let dst_h = (clipped_h / view_h) * selected.h as f32;
 
-            draw_texture_ex(
-                &texture,
-                dst_x,
-                dst_y,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(vec2(dst_w, dst_h)),
-                    source: Some(Rect::new(
-                        clipped_left,
-                        clipped_top,
-                        clipped_w,
-                        clipped_h,
-                    )),
-                    ..Default::default()
-                },
-            );
-        }
+    let use_spotlight = ctrl_down || spotlight_opacity > 0.001;
 
+    if use_spotlight {
+// spotlight_material.set_uniform(
+//     "cursor_uv",
+//     [
+//         spotlight_mouse_x / selected.w as f32,
+//         1.0 - spotlight_mouse_y / selected.h as f32,
+//     ],
+// );
+//
+// spotlight_material.set_uniform(
+//     "screen_size",
+//     [selected.w as f32, selected.h as f32],
+// );
+let win_w = screen_width();
+let win_h = screen_height();
+
+spotlight_material.set_uniform(
+    "cursor_uv",
+    [
+        spotlight_mouse_x / win_w,
+        1.0 - (spotlight_mouse_y / win_h),
+    ],
+);
+
+spotlight_material.set_uniform(
+    "screen_size",
+    [win_w, win_h],
+);
+
+spotlight_material.set_uniform(
+    "spotlight_tint",
+    [0.0f32, 0.0f32, 0.0f32, spotlight_opacity],
+);
+
+spotlight_material.set_uniform(
+    "spotlight_radius_multiplier",
+    spotlight_radius_multiplier,
+);
+        gl_use_material(&spotlight_material);
+    }
+
+    draw_texture_ex(
+        &texture,
+        dst_x,
+        dst_y,
+        WHITE,
+        DrawTextureParams {
+            dest_size: Some(vec2(dst_w, dst_h)),
+            source: Some(Rect::new(
+                clipped_left,
+                clipped_top,
+                clipped_w,
+                clipped_h,
+            )),
+            ..Default::default()
+        },
+    );
+
+    if use_spotlight {
+        gl_use_default_material();
+    }
+}
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::A) {
             break;
         }
