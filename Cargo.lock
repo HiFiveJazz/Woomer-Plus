@@ -2219,16 +2219,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "woomer_plus"
-version = "0.1.0"
-dependencies = [
- "grim-rs",
- "hyprland",
- "macroquad",
- "minifb",
-]
-
-[[package]]
 name = "x11-dl"
 version = "2.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2282,6 +2272,16 @@ name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
+
+[[package]]
+name = "zoomer"
+version = "0.1.0"
+dependencies = [
+ "grim-rs",
+ "hyprland",
+ "macroquad",
+ "minifb",
+]
 
 [[package]]
 name = "zune-core"

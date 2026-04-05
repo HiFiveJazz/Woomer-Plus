@@ -373,7 +373,29 @@ let mut spotlight_material = load_material(
 
     eprintln!("startup before first present: {:?}", startup.elapsed());
 
+// let mut fps_accum = 0.0f32;
+// let mut fps_frames = 0u32;
+// let mut worst_frame = 0.0f32;
+
     loop {
+        // NOTE: This is for printing out frametime information, for performance
+        // let dt = get_frame_time();
+        // fps_accum += dt;
+        // fps_frames += 1;
+        // worst_frame = worst_frame.max(dt);
+        // if fps_accum >= 1.0 {
+        //     let avg_fps = fps_frames as f32 / fps_accum;
+        //     let avg_ms = (fps_accum / fps_frames as f32) * 1000.0;
+        //     let worst_ms = worst_frame * 1000.0;
+        //     eprintln!(
+        //         "avg: {:.2} fps ({:.2} ms), worst: {:.2} ms over {} frames",
+        //         avg_fps, avg_ms, worst_ms, fps_frames
+        //     );
+        //     fps_accum = 0.0;
+        //     fps_frames = 0;
+        //     worst_frame = 0.0;
+        // }
+
         clear_background(BLACK);
 
         draw_blurred_background(
