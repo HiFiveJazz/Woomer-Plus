@@ -2,8 +2,15 @@
 # Woomer+
 
 ![](./demo.gif)
+> [!NOTE]  
+> Currently this only works with Hyprland, but I plan on making this work on other Wayland DEs and operating systems!
 
-A Blazing fast Zoomer application for Hyprland, heavily inspired by [Woomer](https://github.com/coffeeispower/woomer) and [Boomer](https://github.com/tsoding/boomer)
+A blazingly fast Zoomer application⚡ 
+
+Heavily inspired by [Woomer](https://github.com/coffeeispower/woomer) and [Boomer](https://github.com/tsoding/boomer)
+
+
+
 ## Dependencies
 
 ### Arch Linux
