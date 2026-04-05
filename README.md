@@ -14,7 +14,7 @@ $ sudo pacman -S wlr-screencopy
 ## Quick Start
 
 ```console
-$ cargo build --release
+$ cargo +nightly build --release #Minimize build size
 $ ./zoomer --help
 $ ./zoomer
 ```
