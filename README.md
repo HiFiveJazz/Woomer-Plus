@@ -33,7 +33,7 @@ rustup toolchain install nightly
 
 Build and compile it manually or download a pre-compiled binary from [releases](https://github.com/HiFiveJazz/Woomer-Plus/releases/)
 ```bash
-cargo +nightly build --release #Minimize build size
+cargo build --release #Minimize build size, uses nightly by default
 ./zoomer --help
 ./zoomer
 ```
